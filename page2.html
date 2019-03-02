@@ -1,0 +1,87 @@
+<html>
+
+<head>
+  <title>Indexed Database 静的リソースだけでアプリケーションを作るための記憶領域テスト</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.0/jquery.min.js"></script>
+
+  <script>
+    // DB接続
+    var db = null;
+
+    // アクセス回数を更新    
+    function udpateTotalCount() {
+      var countDB = db.transaction("countDB", "readwrite").objectStore("countDB");
+      countDB.get("totalAccess").onsuccess = function(event) {
+        var result = event.target.result;
+        result.count++;
+        $('#total').text(result.count);
+        countDB.put(result);
+      };
+    }
+
+    // アクセス回数を0にする
+    function resetTotalCount() {
+      var countDB = db.transaction("countDB", "readwrite").objectStore("countDB");
+      countDB.put({
+        countType: 'totalAccess',
+        count: 0
+      });
+      $('#total').text(0);
+    }
+
+    // DBに接続する
+    function openDB() {
+      var openRequest = indexedDB.open("AccessCountTest");
+      // 接続に成功すれば各処理を実行
+      openRequest.onsuccess = function(event) {
+        db = event.target.result;
+        db.onerror = function(event) {
+          alert("Database error: " + event.target.errorCode);
+        };
+        udpateTotalCount();
+        // リセット処理にもDBが必要なので接続されてからイベントを設定する
+        $('#resetButton').show();
+        $(document).on('click', '#resetButton', function() {
+          resetTotalCount();
+        });
+      };
+
+      // DB定義を更新
+      openRequest.onupgradeneeded = function(event) {
+        db = event.target.result;
+        db.createObjectStore('countDB', {
+          keyPath: 'countType'
+        }).transaction.oncomplete = function() {
+          // カウント用のオブジェクトを追加しておく
+          db.transaction("countDB", "readwrite").objectStore("countDB").add({
+            countType: 'totalAccess',
+            count: 0
+          });
+        };
+      };
+    }
+
+    $(document).ready(function() {
+      // 開発中にDBリセットするための削除構文
+      //      window.indexedDB.deleteDatabase("AccessCountTest");
+      openDB();
+    });
+
+  </script>
+</head>
+
+<body>
+  <div>
+    <p>
+      今回のアクセスは<span id="total"></span>回目です。
+    </p>
+    <!--
+    <p>
+      ブラウザを開いてからは<span id="session"></span>回目です。
+    </p>
+-->
+  </div>
+  <a id="resetButton" class="btn" style="background-color: aquamarine; display: none">リセット</a>
+</body>
+
+</html>
